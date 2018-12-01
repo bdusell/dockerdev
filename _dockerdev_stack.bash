@@ -1,7 +1,7 @@
 # This file defines functions for managing *stacks* of Docker containers
-# (created with `docker deploy`) that are meant to serve as local development
-# environments. This is necessary if, for example, you want to use a container
-# with Docker secrets.
+# (created with `docker stack deploy`) that are meant to serve as local
+# development environments. This is necessary if, for example, you want to use
+# a container with Docker secrets.
 #
 # You should source this file in another bash script like so:
 #
