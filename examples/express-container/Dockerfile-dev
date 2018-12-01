@@ -1,0 +1,17 @@
+FROM ubuntu:18.04
+RUN apt-get update && \
+    apt-get install -y \
+        curl=7.58.0-2ubuntu3.5 \
+        gnupg=2.2.4-1ubuntu1.1 && \
+# Install a recent version of Node.js.
+# See https://github.com/nodesource/distributions/blob/master/README.md#installation-instructions
+    cd /tmp/ && \
+    curl -sLO https://deb.nodesource.com/setup_10.x && \
+    bash setup_10.x && \
+    rm setup_10.x && \
+    apt-get install -y \
+        nodejs=10.14.0-1nodesource1 \
+        build-essential=12.4ubuntu1 && \
+# Update npm.
+    npm install -g npm
+WORKDIR /app/

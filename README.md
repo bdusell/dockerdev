@@ -36,7 +36,7 @@ distinct problems:
    1. in development
    2. more importantly, in production
 
-This repository is meant to facilitate point 2.1.
+This repository is meant to facilitate point 2.i.
 
 Features
 --------
@@ -78,3 +78,5 @@ Example Usage
     $ cd ..
     $ bash scripts/shell.bash
     > # Now you're in the container
+
+Complete examples are included under `examples/`.
