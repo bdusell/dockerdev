@@ -12,9 +12,9 @@
 # You will mainly be interested in these functions:
 # * dockerdev_ensure_dev_container_started
 # * dockerdev_ensure_dev_container_started_callback
-# * dockerdev_exec_dev
+# * dockerdev_run_in_dev_container
 
-DOCKERDEV_VERSION='0.1.0'
+DOCKERDEV_VERSION='0.2.0'
 
 # dockerdev_container_info <container-name>
 #   Get the image name and status of a container.
@@ -57,12 +57,21 @@ dockerdev_start_new_dev_container() {
   # the same (non-root) user as the host. This allows to do things like write
   # node_modules and lock files into a bind-mounted volume with the correct
   # permissions.
-  # NOTE: The addgroup and adduser commands are specific to Debian, but they
-  # automatically set up a home directory, and some tools balk if there is no
-  # home directory.
-  docker exec -i "$container_name" sh -c "
-    addgroup --gid $groupid $groupname && \
-    adduser --uid $userid --gid $groupid --disabled-password --gecos '' $username
+  # NOTE: The addgroup and adduser commands are not portable across
+  # distributions, but they automatically set up a home directory, and some
+  # tools balk if there is no home directory.
+  # Use `-u 0:0` to make sure we run as root.
+  docker exec -i -u 0:0 "$container_name" sh -c "
+    if addgroup --help 2>&1 | grep -i busybox > /dev/null; then
+      addgroup -g $groupid $groupname && \
+      adduser -u $userid -G $groupname -D -g '' $username
+    elif addgroup --version 2>&1 | grep -i ubuntu > /dev/null; then
+      addgroup --gid $groupid $groupname && \
+      adduser --uid $userid --gid $groupid --disabled-password --gecos '' $username
+    else
+      echo 'error: Could not figure out how to add a new user.'
+      false
+    fi
   "
 }
 
@@ -146,9 +155,9 @@ _dockerdev_ensure_container_started_impl() {
   fi
 }
 
-# dockerdev_exec <docker-exec-args>...
+# dockerdev_run_in_container <docker-exec-args>...
 #   Run a command in a container.
-dockerdev_exec() {
+dockerdev_run_in_container() {
   local cols
   local lines
   # COLUMNS and LINES fix an issue with terminal width.
@@ -158,13 +167,13 @@ dockerdev_exec() {
   docker exec -it -e COLUMNS="$cols" -e LINES="$lines" "$@"
 }
 
-# dockerdev_exec_dev <docker-exec-args>...
+# dockerdev_run_in_dev_container <docker-exec-args>...
 #   Run a command in a container as the same user as the host user.
-dockerdev_exec_dev() {
+dockerdev_run_in_dev_container() {
   local userid
   local groupid
   userid=$(id -u "$USER") &&
   groupid=$(id -g "$USER") &&
   # -u lets us execute the command as the host user.
-  dockerdev_exec -u "$userid:$groupid" "$@"
+  dockerdev_run_in_container -u "$userid:$groupid" "$@"
 }

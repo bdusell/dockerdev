@@ -1,7 +1,7 @@
 # This file defines functions for managing *stacks* of Docker containers
-# (created with `docker stack deploy`) that are meant to serve as local
-# development environments. This is necessary if, for example, you want to use
-# a container with Docker secrets.
+# (created with `docker deploy`) that are meant to serve as local development
+# environments. This is necessary if, for example, you want to use a container
+# with Docker secrets.
 #
 # You should source this file in another bash script like so:
 #
@@ -78,21 +78,30 @@ dockerdev_ensure_dev_user_added() {
   username=$USER &&
   groupid=$(id -g "$USER") &&
   groupname=$(id -gn "$USER") &&
-  docker exec -i "$container_name" sh -c "
+  # See comments in `dockerdev_start_new_dev_container`.
+  docker exec -i -u 0:0 "$container_name" sh -c "
     if ! id -u $username > /dev/null 2>&1; then
-      addgroup --gid $groupid $groupname && \
-      adduser --uid $userid --gid $groupid --disabled-password --gecos '' $username
+      if addgroup --help 2>&1 | grep -i busybox > /dev/null; then
+        addgroup -g $groupid $groupname && \
+        adduser -u $userid -G $groupname -D -g '' $username
+      elif addgroup --version 2>&1 | grep -i ubuntu > /dev/null; then
+        addgroup --gid $groupid $groupname && \
+        adduser --uid $userid --gid $groupid --disabled-password --gecos '' $username
+      else
+        echo 'error: Could not figure out how to add a new user.'
+        false
+      fi
     fi
   "
 }
 
-# dockerdev_ensure_dev_stack_container_ready <docker-compose-file> \
+# dockerdev_ensure_stack_container_ready <docker-compose-file> \
 #     <stack-name> <service> <image>
 #   Ensure that a stack has been deployed and that one of its services has a
 #   container that is ready to receive commands. Ensure that the container is
 #   running a certain image. The stack, service, and container will be created
 #   if they do not already exist, and the image will be updated if necessary.
-dockerdev_ensure_dev_stack_container_ready() {
+dockerdev_ensure_stack_container_ready() {
   local compose_file=$1
   local stack=$2
   local service=$3
@@ -105,22 +114,42 @@ dockerdev_ensure_dev_stack_container_ready() {
   while ! dockerdev_ping_container "$container"; do
     echo "Polling container $container..." &&
     sleep 1
-  done &&
-  dockerdev_ensure_dev_user_added "$container"
+  done
+}
+
+# dockerdev_run_in_stack_container <docker-compose-file> <stack-name> \
+#     <service> <image> <docker-exec-args>...
+#   Ensure that a stack, service, and container have been created as in
+#   `dockerdev_ensure_stack_container_ready`, and also run a command in
+#   the container.
+dockerdev_run_in_stack_container() {
+  local compose_file=$1
+  local stack=$2
+  local service=$3
+  local image=$4
+  shift 4
+  local container
+  dockerdev_ensure_stack_container_ready \
+    "$compose_file" "$stack" "$service" "$image" &&
+  container=$(dockerdev_get_service_container_name "$stack"_"$service") &&
+  dockerdev_run_in_container "$container" "$@"
 }
 
 # dockerdev_run_in_dev_stack_container <docker-compose-file> <stack-name> \
 #     <service> <image> <docker-exec-args>...
 #   Ensure that a stack, service, and container have been created as in
-#   `dockerdev_ensure_dev_stack_container_ready`, and also run a command in
-#   the container.
+#   `dockerdev_ensure_stack_container_ready`. Also create a non-root user in
+#   the container and run a command in the container as that user.
 dockerdev_run_in_dev_stack_container() {
-  local stack=$1
-  local service=$2
-  local image=$3
-  shift 3
+  local compose_file=$1
+  local stack=$2
+  local service=$3
+  local image=$4
+  shift 4
   local container
-  dockerdev_ensure_dev_stack_container_ready "$stack" "$service" "$image" &&
-  container=$(get_service_container_name "$stack"_"$service") &&
-  dockerdev_exec_dev "$container" "$@"
+  dockerdev_ensure_stack_container_ready \
+    "$compose_file" "$stack" "$service" "$image" &&
+  container=$(dockerdev_get_service_container_name "$stack"_"$service") &&
+  dockerdev_ensure_dev_user_added "$container" &&
+  dockerdev_run_in_dev_container "$container" "$@"
 }

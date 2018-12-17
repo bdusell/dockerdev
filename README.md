@@ -6,7 +6,7 @@ easy to use Docker containers as local development environments. Using Docker
 containers this way keeps the environment in which you develop software both
 deterministic and isolated from the rest of your system. It is a much more
 powerful form of determinism and isolation than package managers like `npm`
-and `pipenv`.
+and `pipenv`, which you can still use inside of the container.
 
 You are meant to copy the bash scripts in this repository into your own
 software project, write your own scripts that call the helper functions, and
@@ -21,8 +21,7 @@ correctly.
 
 These scripts are the product of lots of trial and error trying to get a
 nice workflow with Docker set up. They have no major dependencies other than
-bash and Docker. The image of the container being managed needs to be based
-on a Debian-based distribution (including Ubuntu).
+bash and Docker.
 
 Why is this useful?
 -------------------
@@ -49,6 +48,7 @@ Features
 * Creates a non-root user inside the container matching your user on the
   host, so that things like `node_modules` and lock files can be written to
   the host with the correct permissions using bind mounts
+  * Supported for images based on Ubuntu or Alpine
 * Keeping `node_modules` on the host avoids re-installing them every time the
   container image changes
 * Fixes the terminal width and height of the shell inside the container
