@@ -70,8 +70,7 @@ Example Usage
     $ cd /path/to/your/projects/git/repo
     $ mkdir scripts
     $ cd scripts
-    $ wget https://raw.githubusercontent.com/bdusell/dockerdev/master/_dockerdev_container.bash
-    $ wget https://raw.githubusercontent.com/bdusell/dockerdev/master/_dockerdev_stack.bash
+    $ wget https://raw.githubusercontent.com/bdusell/dockerdev/master/dockerdev.bash
     $ git add .
     $ git commit -m 'Add dockerdev scripts.'
     $ vim shell.bash # Write a script to open a shell in the dev environment
