@@ -28,7 +28,7 @@
 # * dockerdev_run_in_dev_stack_container
 #     Runs a command in a dev container that is part of a stack.
 
-DOCKERDEV_VERSION='0.3.1'
+DOCKERDEV_VERSION='0.3.2'
 
 # dockerdev_container_info <container-name>
 #   Get the image name and status of a container.
@@ -47,7 +47,7 @@ dockerdev_start_new_container() {
   local container_name=$1
   local image_name=$2
   shift 2
-  echo 'Starting new container' &&
+  echo 'Starting new container' 1>&2 &&
   docker run -d "$@" --name "$container_name" "$image_name"
 }
 
@@ -141,17 +141,17 @@ _dockerdev_ensure_container_started_impl() {
     # A container with the right name exists.
     local container_image=${BASH_REMATCH[1]}
     local container_status=${BASH_REMATCH[2]}
-    echo "Found container $container_name"
-    echo "  Image:  $container_image"
-    echo "  Status: $container_status"
+    echo "Found container $container_name" 1>&2
+    echo "  Image:  $container_image" 1>&2
+    echo "  Status: $container_status" 1>&2
     if [[ $container_image = $image_name ]]; then
       # The container is running the correct image.
       if [[ $container_status =~ ^Up\  ]]; then
         # The container is running.
-        echo "Container $container_name is already running"
+        echo "Container $container_name is already running" 1>&2
       else
         # The container needs to be started.
-        echo "Starting container $container_name"
+        echo "Starting container $container_name" 1>&2
         docker start "$container_name"
       fi
     else
@@ -160,9 +160,9 @@ _dockerdev_ensure_container_started_impl() {
       local new_name="${container_name}_${container_image}"
       # The existing container needs to be stopped because it is most likely
       # bound to the same port we need.
-      echo "Stopping container $container_name" &&
+      echo "Stopping container $container_name" 1>&2 &&
       docker stop "$container_name" &&
-      echo "Renaming container $container_name to $new_name" &&
+      echo "Renaming container $container_name to $new_name" 1>&2 &&
       docker rename "$container_name" "$new_name" &&
       $start_container_cmd "$image_name" "$container_name" "$@" &&
       $on_start_cmd "$container_name"
@@ -225,21 +225,21 @@ dockerdev_ensure_service_image_updated() {
   local container
   local current_image
   while ! container=$(dockerdev_get_service_container_name "$service"); do
-    echo "Waiting for service $service to appear..." &&
+    echo "Waiting for service $service to appear..." 1>&2 &&
     sleep 1
   done &&
   current_image=$(dockerdev_get_container_image "$container") &&
   while [[ $current_image = '' ]]; do
-    echo "Waiting for container $container to appear..." &&
+    echo "Waiting for container $container to appear..." 1>&2 &&
     sleep 1 &&
     { current_image=$(dockerdev_get_container_image "$container") || return; }
   done &&
-  echo "Found container $container." &&
+  echo "Found container $container." 1>&2 &&
   if [[ $current_image != $image ]]; then
-    echo "Updating image of service $service from $current_image to $image..." &&
-    docker service update --image "$image" --force "$service"
+    echo "Updating image of service $service from $current_image to $image..." 1>&2 &&
+    docker service update --image "$image" --force "$service" 1>&2
   else
-    echo "Image of service $service is already up to date."
+    echo "Image of service $service is already up to date." 1>&2
   fi
 }
 
@@ -267,11 +267,12 @@ dockerdev_ensure_dev_user_added() {
 }
 
 # dockerdev_ensure_stack_container_ready <docker-compose-file> \
-#     <stack-name> <service> <image>
+#     <stack-name> <service> [<image>]
 #   Ensure that a stack has been deployed and that one of its services has a
-#   container that is ready to receive commands. Ensure that the container is
-#   running a certain image. The stack, service, and container will be created
-#   if they do not already exist, and the image will be updated if necessary.
+#   container that is ready to receive commands. If an image argument is
+#   given, ensure that the container is running that exact version of the
+#   image. The stack, service, and container will be created if they do not
+#   already exist, and the image will be updated if necessary.
 dockerdev_ensure_stack_container_ready() {
   local compose_file=$1
   local stack=$2
@@ -279,13 +280,16 @@ dockerdev_ensure_stack_container_ready() {
   local image=$4
   local full_service_name="$stack"_"$service"
   local container
-  docker stack deploy -c "$compose_file" --prune "$stack" &&
-  dockerdev_ensure_service_image_updated "$full_service_name" "$image" &&
+  docker stack deploy -c "$compose_file" --prune "$stack" 1>&2 &&
+  if [[ $image ]]; then
+    dockerdev_ensure_service_image_updated "$full_service_name" "$image"
+  fi &&
   container=$(dockerdev_get_service_container_name "$full_service_name") &&
   while ! dockerdev_ping_container "$container"; do
-    echo "Polling container $container..." &&
+    echo "Polling container $container..." 1>&2 &&
     sleep 1
-  done
+  done &&
+  printf '%s' "$container"
 }
 
 # dockerdev_run_in_stack_container <docker-compose-file> <stack-name> \
@@ -300,9 +304,8 @@ dockerdev_run_in_stack_container() {
   local image=$4
   shift 4
   local container
-  dockerdev_ensure_stack_container_ready \
-    "$compose_file" "$stack" "$service" "$image" &&
-  container=$(dockerdev_get_service_container_name "$stack"_"$service") &&
+  container=$(dockerdev_ensure_stack_container_ready \
+    "$compose_file" "$stack" "$service" "$image") &&
   dockerdev_run_in_container "$container" "$@"
 }
 
@@ -318,9 +321,8 @@ dockerdev_run_in_dev_stack_container() {
   local image=$4
   shift 4
   local container
-  dockerdev_ensure_stack_container_ready \
-    "$compose_file" "$stack" "$service" "$image" &&
-  container=$(dockerdev_get_service_container_name "$stack"_"$service") &&
+  container=$(dockerdev_ensure_stack_container_ready \
+    "$compose_file" "$stack" "$service" "$image") &&
   dockerdev_ensure_dev_user_added "$container" &&
   dockerdev_run_in_dev_container "$container" "$@"
 }
