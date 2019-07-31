@@ -28,7 +28,7 @@
 # * dockerdev_run_in_dev_stack_container
 #     Runs a command in a dev container that is part of a stack.
 
-DOCKERDEV_VERSION='0.3.0'
+DOCKERDEV_VERSION='0.3.1'
 
 # dockerdev_container_info <container-name>
 #   Get the image name and status of a container.
@@ -51,6 +51,30 @@ dockerdev_start_new_container() {
   docker run -d "$@" --name "$container_name" "$image_name"
 }
 
+_dockerdev_add_user() {
+  # NOTE: The addgroup and adduser commands are not portable across Linux
+  # distributions. However, it is best to use them because they automatically
+  # set up a home directory, and some tools balk if there is no home directory.
+  local userid
+  local groupid
+  local groupname
+  userid=$(id -u "$USER") &&
+  groupid=$(id -g "$USER") &&
+  groupname=$(id -gn "$USER") &&
+  echo "
+    if addgroup --help 2>&1 | grep -i busybox > /dev/null; then
+      addgroup -g $groupid $groupname && \
+      adduser -u $userid -G $groupname -D -g '' $USER
+    elif addgroup --version 2>&1 | grep -F debian.org > /dev/null; then
+      addgroup --gid $groupid $groupname && \
+      adduser --uid $userid --gid $groupid --disabled-password --gecos '' $USER
+    else
+      echo 'error: Could not figure out how to add a new user.'
+      false
+    fi
+  "
+}
+
 # dockerdev_start_new_dev_container <container-name> <image-name> \
 #     [<docker-run-flags>...]
 #   Start a new container with a certain image and set up a non-root user.
@@ -58,35 +82,16 @@ dockerdev_start_new_dev_container() {
   local container_name=$1
   local image_name=$2
   shift 2
-  local userid
-  local username
-  local groupid
-  local groupname
-  userid=$(id -u "$USER") &&
-  username=$USER &&
-  groupid=$(id -g "$USER") &&
-  groupname=$(id -gn "$USER") &&
+  local add_user
   dockerdev_start_new_container "$container_name" "$image_name" -it "$@" &&
   # Add a user matching the user on the host system, so we can write files as
   # the same (non-root) user as the host. This allows to do things like write
   # node_modules and lock files into a bind-mounted volume with the correct
-  # permissions.
-  # NOTE: The addgroup and adduser commands are not portable across
-  # distributions, but they automatically set up a home directory, and some
-  # tools balk if there is no home directory.
+  # permissions. We also need to set up a home directory for the user, since
+  # some tools do not work right without one.
+  add_user=$(_dockerdev_add_user) &&
   # Use `-u 0:0` to make sure we run as root.
-  docker exec -i -u 0:0 "$container_name" sh -c "
-    if addgroup --help 2>&1 | grep -i busybox > /dev/null; then
-      addgroup -g $groupid $groupname && \
-      adduser -u $userid -G $groupname -D -g '' $username
-    elif addgroup --version 2>&1 | grep -i ubuntu > /dev/null; then
-      addgroup --gid $groupid $groupname && \
-      adduser --uid $userid --gid $groupid --disabled-password --gecos '' $username
-    else
-      echo 'error: Could not figure out how to add a new user.'
-      false
-    fi
-  "
+  docker exec -i -u 0:0 "$container_name" sh -c "$add_user"
 }
 
 # dockerdev_ensure_container_started <image-name> [<docker-run-flags>...]
@@ -250,27 +255,13 @@ dockerdev_ping_container() {
 #   container. See also `dockerdev_start_new_dev_container`.
 dockerdev_ensure_dev_user_added() {
   local container_name=$1
-  local userid
-  local username
-  local groupid
-  local groupname
-  userid=$(id -u "$USER") &&
-  username=$USER &&
-  groupid=$(id -g "$USER") &&
-  groupname=$(id -gn "$USER") &&
+  local add_user
   # See comments in `dockerdev_start_new_dev_container`.
+  # Check if the user has already been created. If not, create it.
+  add_user=$(_dockerdev_add_user) &&
   docker exec -i -u 0:0 "$container_name" sh -c "
-    if ! id -u $username > /dev/null 2>&1; then
-      if addgroup --help 2>&1 | grep -i busybox > /dev/null; then
-        addgroup -g $groupid $groupname && \
-        adduser -u $userid -G $groupname -D -g '' $username
-      elif addgroup --version 2>&1 | grep -i ubuntu > /dev/null; then
-        addgroup --gid $groupid $groupname && \
-        adduser --uid $userid --gid $groupid --disabled-password --gecos '' $username
-      else
-        echo 'error: Could not figure out how to add a new user.'
-        false
-      fi
+    if ! id -u $USER > /dev/null 2>&1; then
+      $add_user
     fi
   "
 }
