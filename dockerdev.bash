@@ -64,7 +64,7 @@
 if [[ ! $_DOCKERDEV_INCLUDED ]]; then
 _DOCKERDEV_INCLUDED=1
 
-DOCKERDEV_VERSION='0.3.2'
+DOCKERDEV_VERSION='0.3.3'
 
 # dockerdev_container_info <container-name>
 #   Get the image name and status of a container.
