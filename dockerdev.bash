@@ -60,6 +60,10 @@
 # * dockerdev_run_in_dev_stack_container
 #     Runs a command in a dev container that is part of a stack.
 
+# Start of include guard.
+if [[ ! $_DOCKERDEV_INCLUDED ]]; then
+_DOCKERDEV_INCLUDED=1
+
 DOCKERDEV_VERSION='0.3.2'
 
 # dockerdev_container_info <container-name>
@@ -358,3 +362,6 @@ dockerdev_run_in_dev_stack_container() {
   dockerdev_ensure_dev_user_added "$container" &&
   dockerdev_run_in_dev_container "$container" "$@"
 }
+
+# End of include guard.
+fi
