@@ -132,7 +132,7 @@ dockerdev_ensure_container_started() {
   dockerdev_ensure_container_started_callback : "$@"
 }
 
-# dockerdev_ensure_container_started_callback <image-name> <function-name> \
+# dockerdev_ensure_container_started_callback <function-name> <image-name> \
 #     [<docker-run-flags>...]
 #   Like `dockerdev_ensure_container_started`, but accepts the name of a
 #   command to be called just after the container is started. It will not be
