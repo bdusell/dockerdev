@@ -64,7 +64,7 @@
 if [[ ! $_DOCKERDEV_INCLUDED ]]; then
 _DOCKERDEV_INCLUDED=1
 
-DOCKERDEV_VERSION='0.4.0'
+DOCKERDEV_VERSION='0.4.1'
 
 # dockerdev_container_info <container-name>
 #   Get the image name and status of a container.
@@ -96,14 +96,15 @@ _dockerdev_add_user() {
   local groupname
   userid=$(id -u "$USER") &&
   groupid=$(id -g "$USER") &&
-  groupname=$(id -gn "$USER") &&
+  # On Mac, the group name might not be valid in Linux, so we normalize it.
+  groupname=$(id -gn "$USER" | tr '[A-Z]' '[a-z]' | sed 's/[^-a-z0-9_.@]/-/g') &&
   echo "
     if addgroup --help 2>&1 | grep -i busybox > /dev/null; then
-      addgroup -g $groupid $groupname && \
-      adduser -u $userid -G $groupname -D -g '' $USER
+      addgroup -g $groupid '$groupname' && \
+      adduser -u $userid -G '$groupname' -D -g '' '$USER'
     elif addgroup --version 2>&1 | grep -F debian.org > /dev/null; then
-      addgroup --gid $groupid $groupname && \
-      adduser --uid $userid --gid $groupid --disabled-password --gecos '' $USER
+      addgroup --gid $groupid '$groupname' && \
+      adduser --uid $userid --gid $groupid --disabled-password --gecos '' '$USER'
     else
       echo 'error: Could not figure out how to add a new user.'
       false
@@ -144,28 +145,47 @@ dockerdev_start_new_dev_container() {
     # and https://medium.com/@SaravSun/running-gui-applications-inside-docker-containers-83d65c0db110
     userid=$(id -u "$USER") &&
     groupid=$(id -g "$USER") &&
-    dockerdev_start_new_container "$container_name" "$image_name" -it \
-      -u "$userid":"$groupid" \
-      -e DISPLAY \
-      -v /etc/group:/etc/group:ro \
-      -v /etc/passwd:/etc/passwd:ro \
-      -v /etc/shadow:/etc/shadow:ro \
-      -v /etc/sudoers.d:/etc/sudoers.d:ro \
-      -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
-      -v "$HOME"/.Xauthority:"$HOME"/.Xauthority:rw \
-      --net host \
-      "$@" &&
-    # See https://serverfault.com/questions/63764/create-home-directories-after-create-users/508509
-    # Use `-u 0:0` to make sure we run as root.
-    docker exec -i -u 0:0 "$container_name" sh -c "
-      cd $HOME && \
-      cp -r /etc/skel/. . && \
-      chown -R $userid:$groupid . && \
-      chmod -R go=u,go-w . && \
-      chmod go= .
-    "
+    case "$OSTYPE" in
+      darwin*)
+        # On Mac, follow this tutorial:
+        # https://sourabhbajaj.com/blog/2017/02/07/gui-applications-docker-mac/
+        local ip_address &&
+        ip_address=$(ifconfig en0 | grep inet | awk '$1=="inet" {print $2}') &&
+        xhost + "$ip_address" > /dev/null &&
+        dockerdev_start_new_container "$container_name" "$image_name" -it \
+          -u "$userid":"$groupid" \
+          -e DISPLAY="$ip_address":0 \
+          -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+          "$@" &&
+        local add_user &&
+        add_user=$(_dockerdev_add_user) &&
+        docker exec -i -u 0:0 "$container_name" sh -c "$add_user"
+        ;;
+      *)
+        dockerdev_start_new_container "$container_name" "$image_name" -it \
+          -u "$userid":"$groupid" \
+          -e DISPLAY \
+          -v /etc/group:/etc/group:ro \
+          -v /etc/passwd:/etc/passwd:ro \
+          -v /etc/shadow:/etc/shadow:ro \
+          -v /etc/sudoers.d:/etc/sudoers.d:ro \
+          -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+          -v "$HOME"/.Xauthority:"$HOME"/.Xauthority:rw \
+          --net host \
+          "$@" &&
+          # See https://serverfault.com/questions/63764/create-home-directories-after-create-users/508509
+          # Use `-u 0:0` to make sure we run as root.
+          docker exec -i -u 0:0 "$container_name" sh -c "
+            cd $HOME && \
+            cp -r /etc/skel/. . && \
+            chown -R $userid:$groupid . && \
+            chmod -R go=u,go-w . && \
+            chmod go= .
+          "
+        ;;
+    esac
   else
-    local add_user
+    local add_user &&
     dockerdev_start_new_container "$container_name" "$image_name" -it "$@" &&
     # Add a user matching the user on the host system, so we can write files as
     # the same (non-root) user as the host. This allows us to do things like
