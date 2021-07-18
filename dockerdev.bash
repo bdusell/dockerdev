@@ -61,10 +61,10 @@
 #     Runs a command in a dev container that is part of a stack.
 
 # Start of include guard.
-if [[ ! $_DOCKERDEV_INCLUDED ]]; then
+if [[ ! ${_DOCKERDEV_INCLUDED-} ]]; then
 _DOCKERDEV_INCLUDED=1
 
-DOCKERDEV_VERSION='0.4.1'
+DOCKERDEV_VERSION='0.4.2'
 
 # dockerdev_container_info <container-name>
 #   Get the image name and status of a container.
@@ -118,8 +118,8 @@ _dockerdev_add_user() {
 #   the --x11 flag is used, the container will be connected to the X server on
 #   the host so that GUIs can be used.
 dockerdev_start_new_dev_container() {
-  local container_name
-  local image_name
+  local container_name=
+  local image_name=
   local x11=false
   while [[ $# -gt 0 ]]; do
     case $1 in
@@ -229,9 +229,9 @@ dockerdev_ensure_dev_container_started() {
 # _dockerdev_ensure_container_started_impl <image-name> [--start <command>] \
 #   [--on-start <command>] [<start-args>...] [-- <docker-run-flags>...]
 _dockerdev_ensure_container_started_impl() {
-  local start_container_cmd
+  local start_container_cmd=
   local on_start_cmd=:
-  local image_name
+  local image_name=
   local start_args=()
   while [[ $# -gt 0 ]]; do
     case $1 in
