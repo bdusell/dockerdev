@@ -64,7 +64,7 @@
 if [[ ! ${_DOCKERDEV_INCLUDED-} ]]; then
 _DOCKERDEV_INCLUDED=1
 
-DOCKERDEV_VERSION='0.4.2'
+DOCKERDEV_VERSION='0.4.3'
 
 # dockerdev_container_info <container-name>
 #   Get the image name and status of a container.
@@ -293,11 +293,18 @@ _dockerdev_ensure_container_started_impl() {
 dockerdev_run_in_container() {
   local cols
   local lines
+  local flags=i
+  # Automatically use a pseduo-TTY if stdout is a TTY. Disabling this option
+  # when stdout is not a TTY lets Docker play nice with batch submission
+  # systems.
+  if [[ -t 1 ]]; then
+    flags+=t
+  fi &&
   # COLUMNS and LINES fix an issue with terminal width.
   # See https://github.com/moby/moby/issues/33794
   cols=$(tput cols) &&
   lines=$(tput lines) &&
-  docker exec -it -e COLUMNS="$cols" -e LINES="$lines" "$@"
+  docker exec -"$flags" -e COLUMNS="$cols" -e LINES="$lines" "$@"
 }
 
 # dockerdev_run_in_dev_container <docker-exec-args>...
