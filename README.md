@@ -61,6 +61,8 @@ Features
   automatically updated
 * If the container in the stack needs to be created or updated, automatically
   waits until the container is ready to run commands before running a command
+* Supports the use of Docker clients within the container by connecting them
+  to the Docker daemon on the host
 * Every function is well-documented, and every quirk and workaround is
   commented
 

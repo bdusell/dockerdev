@@ -64,7 +64,7 @@
 if [[ ! ${_DOCKERDEV_INCLUDED-} ]]; then
 _DOCKERDEV_INCLUDED=1
 
-DOCKERDEV_VERSION='0.4.3'
+DOCKERDEV_VERSION='0.5.0'
 
 # dockerdev_container_info <container-name>
 #   Get the image name and status of a container.
@@ -113,17 +113,22 @@ _dockerdev_add_user() {
 }
 
 # dockerdev_start_new_dev_container <container-name> <image-name> \
-#     [--x11] [-- <docker-run-flags>...]
-#   Start a new container with a certain image and set up a non-root user. If
-#   the --x11 flag is used, the container will be connected to the X server on
-#   the host so that GUIs can be used.
+#     [--x11] [--docker] [-- <docker-run-flags>...]
+#   Start a new container with a certain image and set up a non-root user.
+#   Options:
+#   --x11     Connect the container to the X server on the host so that GUIs
+#             can be used.
+#   --docker  Connect the container to the Docker daemon on the host so that
+#             it can use the Docker client.
 dockerdev_start_new_dev_container() {
   local container_name=
   local image_name=
   local x11=false
+  local docker=false
   while [[ $# -gt 0 ]]; do
     case $1 in
       --x11) x11=true ;;
+      --docker) docker=true ;;
       --) shift; break ;;
       *)
         if [[ ! $container_name ]]; then
@@ -137,6 +142,25 @@ dockerdev_start_new_dev_container() {
     esac
     shift
   done
+  # Add the docker group to the user so we have the proper permissions to run
+  # Docker-in-Docker. Only supported for Linux for now.
+  local docker_in_docker_args=() &&
+  if $docker; then
+    case "$OSTYPE" in
+      darwin*)
+        echo 'error: --docker is not implemented for MacOS' 1>&2 &&
+        return 1
+        ;;
+      *)
+        local dockergroupid
+        dockergroupid=$(getent group docker | cut -d : -f 3) &&
+        docker_in_docker_args=( \
+          --group-add "$dockergroupid" \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+        )
+        ;;
+    esac
+  fi
   if $x11; then
     local userid
     local groupid
@@ -154,6 +178,7 @@ dockerdev_start_new_dev_container() {
         xhost + "$ip_address" > /dev/null &&
         dockerdev_start_new_container "$container_name" "$image_name" -it \
           -u "$userid":"$groupid" \
+          "${docker_in_docker_args[@]}" \
           -e DISPLAY="$ip_address":0 \
           -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
           "$@" &&
@@ -164,6 +189,7 @@ dockerdev_start_new_dev_container() {
       *)
         dockerdev_start_new_container "$container_name" "$image_name" -it \
           -u "$userid":"$groupid" \
+          "${docker_in_docker_args[@]}" \
           -e DISPLAY \
           -v /etc/group:/etc/group:ro \
           -v /etc/passwd:/etc/passwd:ro \
@@ -186,7 +212,11 @@ dockerdev_start_new_dev_container() {
     esac
   else
     local add_user &&
-    dockerdev_start_new_container "$container_name" "$image_name" -it "$@" &&
+    dockerdev_start_new_container \
+      "$container_name" \
+      "$image_name" \
+      -it "$@" \
+      "${docker_in_docker_args[@]}" &&
     # Add a user matching the user on the host system, so we can write files as
     # the same (non-root) user as the host. This allows us to do things like
     # write node_modules and lock files into a bind-mounted volume with the
