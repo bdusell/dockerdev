@@ -64,7 +64,7 @@
 if [[ ! ${_DOCKERDEV_INCLUDED-} ]]; then
 _DOCKERDEV_INCLUDED=1
 
-DOCKERDEV_VERSION='0.5.0'
+DOCKERDEV_VERSION='0.5.1'
 
 # dockerdev_container_info <container-name>
 #   Get the image name and status of a container.
@@ -178,7 +178,7 @@ dockerdev_start_new_dev_container() {
         xhost + "$ip_address" > /dev/null &&
         dockerdev_start_new_container "$container_name" "$image_name" -it \
           -u "$userid":"$groupid" \
-          "${docker_in_docker_args[@]}" \
+          ${docker_in_docker_args[@]+"${docker_in_docker_args[@]}"} \
           -e DISPLAY="$ip_address":0 \
           -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
           "$@" &&
@@ -189,7 +189,7 @@ dockerdev_start_new_dev_container() {
       *)
         dockerdev_start_new_container "$container_name" "$image_name" -it \
           -u "$userid":"$groupid" \
-          "${docker_in_docker_args[@]}" \
+          ${docker_in_docker_args[@]+"${docker_in_docker_args[@]}"} \
           -e DISPLAY \
           -v /etc/group:/etc/group:ro \
           -v /etc/passwd:/etc/passwd:ro \
@@ -216,7 +216,7 @@ dockerdev_start_new_dev_container() {
       "$container_name" \
       "$image_name" \
       -it "$@" \
-      "${docker_in_docker_args[@]}" &&
+      ${docker_in_docker_args[@]+"${docker_in_docker_args[@]}"} &&
     # Add a user matching the user on the host system, so we can write files as
     # the same (non-root) user as the host. This allows us to do things like
     # write node_modules and lock files into a bind-mounted volume with the
@@ -308,12 +308,12 @@ _dockerdev_ensure_container_started_impl() {
       docker stop "$container_name" &&
       echo "Renaming container $container_name to $new_name" 1>&2 &&
       docker rename "$container_name" "$new_name" &&
-      $start_container_cmd "${start_args[@]}" "$image_name" "$container_name" "$@" &&
+      $start_container_cmd ${start_args[@]+"${start_args[@]}"} "$image_name" "$container_name" "$@" &&
       $on_start_cmd "$container_name"
     fi
   else
     # No container with the expected name exists.
-    $start_container_cmd "${start_args[@]}" "$image_name" "$container_name" "$@" &&
+    $start_container_cmd ${start_args[@]+"${start_args[@]}"} "$image_name" "$container_name" "$@" &&
     $on_start_cmd "$container_name"
   fi
 }
