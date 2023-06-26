@@ -136,6 +136,8 @@ dockerdev_start_new_dev_container() {
         elif [[ ! $image_name ]]; then
           image_name=$1
         else
+          echo "error: unrecognized argument to dockerdev_start_new_dev_container: $1" 1>&2 &&
+          echo "       Did you forget to use -- with dockerdev_ensure_dev_container_started?" 1>&2 &&
           return 1
         fi
         ;;
