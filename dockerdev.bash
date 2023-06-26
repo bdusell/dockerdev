@@ -99,12 +99,12 @@ _dockerdev_add_user() {
   # On Mac, the group name might not be valid in Linux, so we normalize it.
   groupname=$(id -gn "$USER" | tr '[A-Z]' '[a-z]' | sed 's/[^-a-z0-9_.@]/-/g') &&
   echo "
-    if addgroup --help 2>&1 | grep -i busybox > /dev/null; then
-      addgroup -g $groupid '$groupname' && \
-      adduser -u $userid -G '$groupname' -D -g '' '$USER'
-    elif addgroup --version 2>&1 | grep -F debian.org > /dev/null; then
-      addgroup --gid $groupid '$groupname' && \
-      adduser --uid $userid --gid $groupid --disabled-password --gecos '' '$USER'
+    if addgroup --help 2>&1 | head -1 | grep -i busybox > /dev/null; then
+      addgroup -g $groupid $(printf %q "$groupname") && \
+      adduser -u $userid -G $(printf %q "$groupname") -D -g '' $(printf %q "$USER")
+    elif addgroup --help 2>&1 | grep -F -- '--gid ID' > /dev/null; then
+      addgroup --gid $groupid $(printf %q "$groupname") && \
+      adduser --uid $userid --gid $groupid --disabled-password --gecos '' $(printf %q "$USER")
     else
       echo 'error: Could not figure out how to add a new user.'
       false
