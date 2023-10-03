@@ -45,7 +45,7 @@
 # You should source this file in another bash script like so:
 #
 #     . dockerdev.bash
-# 
+#
 # or
 #
 #     source dockerdev.bash
