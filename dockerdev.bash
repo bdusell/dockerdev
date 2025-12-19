@@ -214,11 +214,18 @@ dockerdev_start_new_dev_container() {
           # See https://serverfault.com/questions/63764/create-home-directories-after-create-users/508509
           # Use `-u 0:0` to make sure we run as root.
           docker exec -i -u 0:0 "$container_name" sh -c "
-            cd $HOME && \
-            cp -r /etc/skel/. . && \
-            chown -R $userid:$groupid . && \
-            chmod -R go=u,go-w . && \
-            chmod go= .
+            chown $userid:$groupid $HOME && \
+            chmod go= $HOME && \
+            cd /etc/skel && \
+            for s in \`ls -A\`; do
+              d=$HOME/\$s
+              if ! [ -e \"\$d\" ]; then
+                cp -r \"\$s\" \"\$d\" && \
+                chown -R $userid:$groupid \"\$d\" && \
+                chmod -R go=u,go-w \"\$d\"
+              fi || \
+              exit 1
+            done
           "
         ;;
     esac
