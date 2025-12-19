@@ -109,7 +109,7 @@ _dockerdev_add_user() {
       adduser -u $userid -G $(printf %q "$groupname") -D -g '' $(printf %q "$USER")
     elif addgroup --help 2>&1 | grep -F -- '--gid ID' > /dev/null; then
       if ! result=\`addgroup --gid $groupid $(printf %q "$groupname") 2>&1\`; then
-        echo \"\$result\" | grep '^addgroup: The group \`.*'\\'' already exists\\.$'
+        echo \"\$result\" | grep 'The group \`.*'\\'' already exists\\.$'
       else
         echo \"\$result\" >&2
         false
